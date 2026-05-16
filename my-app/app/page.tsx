@@ -5,28 +5,22 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { menuItems, categories, MenuItem } from "./menu-data"
 
-// 注文履歴1回分のデータ構造を定義
 type OrderHistory = {
-  orderId: string;      // 注文番号（例: ORD-A1B2）
-  time: string;         // 注文した時刻
-  items: { item: MenuItem; quantity: number }[]; // 注文した商品リスト
-  totalPrice: number;   // その回の合計金額
+  orderId: string;
+  time: string;
+  items: { item: MenuItem; quantity: number }[];
+  totalPrice: number;
 };
 
 export default function Home() {
-  // --- 1. 状態（State）の定義 ---
   const [cart, setCart] = useState<{ item: MenuItem; quantity: number }[]>([]);
+  // 初期状態を「welcome（入店画面）」に変更
+  const [viewMode, setViewMode] = useState<"welcome" | "menu" | "cart" | "history">("welcome");
   const [peopleCount, setPeopleCount] = useState<number>(1);
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [activeCategory, setActiveCategory] = useState<string>(categories[0]);
-  
-  // 画面の切り替え状態を管理 ("menu" | "cart" | "history")
-  const [viewMode, setViewMode] = useState<"menu" | "cart" | "history">("menu");
-  
-  // 過去の注文履歴を保存する配列
   const [orderHistoryList, setOrderHistoryList] = useState<OrderHistory[]>([]);
 
-  // --- 2. スクロール連動機能（Scroll Spy） ---
   useEffect(() => {
     const handleScroll = () => {
       let current = categories[0];
@@ -48,9 +42,6 @@ export default function Home() {
     }
   }, [viewMode]);
 
-  // --- 3. 計算・処理関数（表示と計算の分離） ---
-  
-  // カートに商品を追加する処理（品切れ制御付き）
   const handleAddToCart = (item: MenuItem) => {
     if (item.isSoldOut) {
       setErrorMessage(`${item.name} は現在売り切れです。`);
@@ -66,7 +57,6 @@ export default function Home() {
     });
   };
 
-  // カートから数量を減らす処理
   const handleRemoveFromCart = (itemId: number) => {
     setCart((prev) => {
       const existing = prev.find((p) => p.item.id === itemId);
@@ -77,45 +67,61 @@ export default function Home() {
     });
   };
 
-  // カート内の合計金額の計算（reduceを活用）
+  // カートの合計
   const calculateTotal = () => cart.reduce((sum, c) => sum + (c.item.price * c.quantity), 0);
-  
-  // カート内の合計点数の計算（reduceを活用）
   const calculateTotalQuantity = () => cart.reduce((sum, c) => sum + c.quantity, 0);
   
-  // 割り勘金額の計算（0や空入力をガード）
-  const calculateSplit = () => {
-    const total = calculateTotal();
-    if (!peopleCount || peopleCount <= 0) return total;
-    return Math.ceil(total / peopleCount);
-  };
+  // 過去の注文の合計
+  const calculateAllHistoryTotal = () => orderHistoryList.reduce((sum, order) => sum + order.totalPrice, 0);
 
-  // 注文を確定させ、履歴へ移す処理
+  // 【修正】総合計（現在のカート ＋ 過去の注文）から全体の1人あたりの金額を計算
+  const grandTotal = calculateTotal() + calculateAllHistoryTotal();
+  const splitAmount = peopleCount > 0 ? Math.ceil(grandTotal / peopleCount) : grandTotal;
+
   const handleConfirmOrder = () => {
     if (cart.length === 0) return;
-
-    // 今回の注文内容を履歴データとして作成
     const newOrder: OrderHistory = {
-      orderId: `ORD-${Math.random().toString(36).substring(2, 6).toUpperCase()}`, // ランダムな注文ID生成
-      time: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      orderId: `ORD-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+      time: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
       items: [...cart],
-      totalPrice: calculateTotal()
+      totalPrice: calculateTotal(),
     };
-
-    // 履歴リストの先頭に追加し、カートを空にする
     setOrderHistoryList((prev) => [newOrder, ...prev]);
     setCart([]);
-    setViewMode("history"); // 注文履歴画面へジャンプ
+    setViewMode("history");
   };
-
-  // 全注文履歴を通した総合計金額の計算（reduceを活用）
-  const calculateAllHistoryTotal = () => {
-    return orderHistoryList.reduce((sum, order) => sum + order.totalPrice, 0);
-  };
-
 
   // ==============================================================
-  // 画面パターン1：カート画面（viewMode === "cart"）
+  // 画面パターン0：入店（人数入力）画面
+  // ==============================================================
+  if (viewMode === "welcome") {
+    return (
+      <div className="mx-auto w-full max-w-md min-h-screen bg-zinc-950 text-zinc-50 flex flex-col items-center justify-center p-6 font-sans sm:border sm:border-zinc-800 sm:shadow-2xl">
+        <h1 className="text-3xl font-bold mb-8 tracking-wider">Osaki Dining</h1>
+        <Card className="w-full bg-zinc-900 border-zinc-800 shadow-xl">
+          <CardContent className="p-6 flex flex-col items-center space-y-8 pt-8">
+            <h2 className="text-lg font-bold text-zinc-200">ご来店ありがとうございます</h2>
+            
+            <div className="flex flex-col items-center space-y-4">
+              <span className="text-zinc-400 text-sm">ご利用人数を入力してください</span>
+              <div className="flex items-center bg-zinc-950 rounded-lg border border-zinc-700 p-2 shadow-inner">
+                <button onClick={() => setPeopleCount(prev => Math.max(1, prev - 1))} className="w-14 h-14 flex items-center justify-center text-zinc-400 hover:text-white font-bold text-2xl transition-colors">-</button>
+                <span className="w-20 text-center text-3xl font-bold font-mono text-white">{peopleCount}</span>
+                <button onClick={() => setPeopleCount(prev => prev + 1)} className="w-14 h-14 flex items-center justify-center text-zinc-400 hover:text-white font-bold text-2xl transition-colors">+</button>
+              </div>
+            </div>
+
+            <Button onClick={() => setViewMode("menu")} className="w-full h-14 text-lg font-bold bg-rose-700 hover:bg-rose-600 text-white border-0 shadow-lg mt-4">
+              注文を始める
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // ==============================================================
+  // 画面パターン1：カート確認画面
   // ==============================================================
   if (viewMode === "cart") {
     return (
@@ -145,7 +151,7 @@ export default function Home() {
             
             <div className="border-t border-zinc-800 pt-4 mt-8">
               <div className="flex justify-between items-center text-lg font-bold">
-                <span>カート内合計</span>
+                <span>カート内小計</span>
                 <span className="text-rose-500 text-xl">¥{calculateTotal().toLocaleString()}</span>
               </div>
             </div>
@@ -153,11 +159,7 @@ export default function Home() {
         </main>
 
         <footer className="bg-zinc-900 border-t border-zinc-800 p-4 sticky bottom-0 z-20 w-full">
-          {/* 【機能修正】クリックで注文確定関数を呼び出し、カートを空にして履歴へ */}
-          <Button 
-            className="w-full h-14 text-lg font-bold shadow-lg bg-rose-700 hover:bg-rose-600 text-white border-0" 
-            onClick={handleConfirmOrder}
-          >
+          <Button className="w-full h-14 text-lg font-bold shadow-lg bg-rose-700 hover:bg-rose-600 text-white border-0" onClick={handleConfirmOrder}>
             注文を確定する
           </Button>
         </footer>
@@ -166,20 +168,25 @@ export default function Home() {
   }
 
   // ==============================================================
-  // 画面パターン2：注文履歴画面（viewMode === "history"）
+  // 画面パターン2：注文履歴画面
   // ==============================================================
   if (viewMode === "history") {
     return (
       <div className="mx-auto w-full max-w-md min-h-screen bg-zinc-950 text-zinc-50 flex flex-col relative sm:border sm:border-zinc-800 sm:shadow-2xl font-sans">
-        <header className="bg-zinc-900 px-4 py-4 sticky top-0 z-20 border-b border-zinc-800 flex items-center shadow-sm">
-          <h1 className="text-lg font-bold tracking-wider">注文履歴・送信完了</h1>
+        <header className="bg-zinc-900 px-4 py-4 sticky top-0 z-20 border-b border-zinc-800 flex items-center justify-between shadow-sm">
+          <h1 className="text-lg font-bold tracking-wider">注文履歴</h1>
+          <Button variant="ghost" size="sm" onClick={() => setViewMode("menu")} className="text-zinc-400 hover:text-white">✕ 閉じる</Button>
         </header>
 
         <main className="flex-1 p-4 space-y-6 overflow-y-auto">
-          {/* 総合計金額（これまで送信したすべての注文の合計） */}
-          <div className="bg-zinc-900 p-4 rounded-xl border border-zinc-800 text-center shadow-md">
-            <p className="text-xs text-zinc-400 mb-1">現在の注文総合計金額</p>
-            <p className="text-2xl font-black text-rose-500">¥{calculateAllHistoryTotal().toLocaleString()}</p>
+          {/* 【修正】総合計と割り勘の表示 */}
+          <div className="bg-zinc-900 p-5 rounded-xl border border-zinc-800 text-center shadow-md">
+            <p className="text-xs text-zinc-400 mb-1">現在のご利用金額（総合計）</p>
+            <p className="text-3xl font-black text-rose-500 mb-3">¥{grandTotal.toLocaleString()}</p>
+            <div className="inline-flex items-center space-x-2 bg-zinc-950 px-3 py-1.5 rounded-full border border-zinc-800">
+              <span className="text-xs text-zinc-400">{peopleCount}名での割り勘:</span>
+              <span className="text-sm font-bold text-white">1人あたり ¥{splitAmount.toLocaleString()}</span>
+            </div>
           </div>
 
           <h2 className="text-sm font-bold text-zinc-400 uppercase tracking-wider px-1">これまでの注文内訳</h2>
@@ -193,10 +200,8 @@ export default function Home() {
                   <CardContent className="p-4 space-y-3">
                     <div className="flex justify-between items-center text-xs text-zinc-400 border-b border-zinc-800 pb-2">
                       <span className="font-mono bg-zinc-950 px-2 py-0.5 rounded text-zinc-300 font-bold">{order.orderId}</span>
-                      <span>注文時刻: {order.time}</span>
+                      <span>{order.time}</span>
                     </div>
-                    
-                    {/* その回に注文した商品リスト */}
                     <div className="space-y-1.5">
                       {order.items.map((c) => (
                         <div key={c.item.id} className="flex justify-between text-sm">
@@ -205,8 +210,7 @@ export default function Home() {
                         </div>
                       ))}
                     </div>
-
-                    <div className="flex justify-between items-center pt-2 border-t border-zinc-800/60 text-sm font-bold">
+                    <div className="flex justify-between items-center pt-2 border-t border-zinc-800 text-sm font-bold">
                       <span className="text-zinc-400">小計</span>
                       <span className="text-white">¥{order.totalPrice.toLocaleString()}</span>
                     </div>
@@ -218,11 +222,8 @@ export default function Home() {
         </main>
 
         <footer className="bg-zinc-900 border-t border-zinc-800 p-4 sticky bottom-0 z-20 w-full">
-          <Button 
-            className="w-full h-14 text-base font-bold bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700" 
-            onClick={() => setViewMode("menu")}
-          >
-            追加で注文する（メニューへ）
+          <Button variant="outline" className="w-full h-14 text-base font-bold bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700" onClick={() => setViewMode("menu")}>
+            追加で注文する
           </Button>
         </footer>
       </div>
@@ -230,7 +231,7 @@ export default function Home() {
   }
 
   // ==============================================================
-  // 画面パターン3：メニュー閲覧画面（viewMode === "menu"）
+  // 画面パターン3：メニュー閲覧画面
   // ==============================================================
   return (
     <div className="mx-auto w-full max-w-md min-h-screen bg-zinc-950 text-zinc-50 flex flex-col relative sm:border sm:border-zinc-800 sm:shadow-2xl font-sans scroll-smooth">
@@ -245,14 +246,8 @@ export default function Home() {
         <div className="flex justify-between items-center mb-3">
           <h1 className="text-lg font-bold tracking-wider">Osaki Dining</h1>
           <div className="flex items-center space-x-2">
-            {/* 履歴がある場合のみ、メニュー画面からいつでも履歴に飛べる隠しボタン */}
             {orderHistoryList.length > 0 && (
-              <Button 
-                size="sm" 
-                variant="outline" 
-                className="text-xs border-zinc-700 text-zinc-300 h-7 px-2"
-                onClick={() => setViewMode("history")}
-              >
+              <Button size="sm" variant="outline" className="text-xs border-zinc-700 text-zinc-300 h-7 px-2" onClick={() => setViewMode("history")}>
                 注文履歴
               </Button>
             )}
@@ -260,7 +255,7 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="flex space-x-5 overflow-x-auto pb-2 text-sm font-medium [&::-webkit-scrollbar]:hidden mt-2">
+        <div className="flex space-x-5 overflow-x-auto pb-2 text-sm font-medium mt-2 [&::-webkit-scrollbar]:block [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:bg-zinc-700 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-zinc-900">
           {categories.map((cat, index) => (
             <button 
               key={index} 
@@ -269,9 +264,7 @@ export default function Home() {
                 document.getElementById(cat)?.scrollIntoView({ behavior: 'smooth' });
               }}
               className={`pb-1 whitespace-nowrap cursor-pointer transition-colors outline-none border-b-2 ${
-                activeCategory === cat 
-                  ? "border-rose-600 text-rose-500" 
-                  : "border-transparent text-zinc-400 hover:text-zinc-200"
+                activeCategory === cat ? "border-rose-600 text-rose-500" : "border-transparent text-zinc-400 hover:text-zinc-200"
               }`}
             >
               {cat}
@@ -293,15 +286,10 @@ export default function Home() {
                   
                   <div className="h-32 bg-zinc-800 flex items-center justify-center text-zinc-500 text-xs relative overflow-hidden">
                     {item.imageUrl && (item.imageUrl.startsWith("http") || item.imageUrl.startsWith("/")) ? (
-                      <img 
-                        src={item.imageUrl} 
-                        alt={item.name} 
-                        className="w-full h-full object-cover" 
-                      />
+                      <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
                     ) : (
                       <span>{item.imageUrl}</span>
                     )}
-                    
                     {item.badge && !item.isSoldOut && <span className="absolute top-2 left-2 bg-rose-700 text-white text-[10px] font-bold px-2 py-1 rounded-sm shadow">{item.badge}</span>}
                     {item.isSoldOut && <span className="absolute inset-0 bg-black/60 flex items-center justify-center text-white font-bold text-lg tracking-widest backdrop-blur-[1px]">SOLD OUT</span>}
                   </div>
@@ -330,30 +318,21 @@ export default function Home() {
       </main>
 
       <footer className="bg-zinc-900 border-t border-zinc-800 p-4 sticky bottom-0 z-20 w-full">
+        {/* 【修正】人数変更ボタンと、総合計からの割り勘表示 */}
         <div className="flex items-center justify-between mb-3 text-sm px-2">
-          <div className="flex items-center space-x-2">
-            <span className="text-zinc-400">人数:</span>
-            <input 
-              type="number" 
-              min="1" 
-              value={peopleCount} 
-              onChange={(e) => setPeopleCount(Number(e.target.value))}
-              className="w-16 bg-zinc-950 text-white rounded px-2 py-1 outline-none border border-zinc-700 text-center"
-            />
+          <div className="flex items-center space-x-3">
+            <span className="text-zinc-400">ご来店: {peopleCount}名</span>
+            <button onClick={() => setViewMode("welcome")} className="text-xs border border-zinc-700 text-zinc-400 px-2 py-0.5 rounded hover:bg-zinc-800 hover:text-white transition-colors">人数変更</button>
           </div>
           <div className="text-zinc-300">
-            1人あたり: <span className="font-bold text-rose-500 text-base ml-1">¥{calculateSplit().toLocaleString()}</span>
+            総合計1人あたり: <span className="font-bold text-rose-500 text-base ml-1">¥{splitAmount.toLocaleString()}</span>
           </div>
         </div>
 
         <Button 
-          onClick={() => {
-            if(cart.length > 0) setViewMode("cart");
-          }} 
+          onClick={() => { if(cart.length > 0) setViewMode("cart"); }} 
           className={`w-full h-14 text-base font-bold flex justify-between items-center px-6 shadow-lg border-0 transition-opacity ${
-            cart.length > 0 
-              ? "bg-rose-700 hover:bg-rose-600 text-white cursor-pointer" 
-              : "bg-zinc-800 text-zinc-500 cursor-not-allowed"
+            cart.length > 0 ? "bg-rose-700 hover:bg-rose-600 text-white cursor-pointer" : "bg-zinc-800 text-zinc-500 cursor-not-allowed"
           }`}
         >
           <span className="bg-black/30 px-3 py-1 rounded text-sm">{calculateTotalQuantity()}</span>
