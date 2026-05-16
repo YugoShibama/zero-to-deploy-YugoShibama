@@ -9,7 +9,7 @@ export default function Home() {
       {/* 【要件1】ヘッダー：店舗情報・受取方法選択 */}
       <header className="bg-zinc-900 px-4 pt-4 pb-2 sticky top-0 z-20 border-b border-zinc-800 shadow-sm">
         <div className="flex justify-between items-center mb-3">
-          <h1 className="text-lg font-bold tracking-wider">Italian Bar Attachment</h1>
+          <h1 className="text-lg font-bold tracking-wider">Osaki Dining</h1>
           {/* 営業状態の視覚的なバッジ */}
           <span className="bg-emerald-900/50 text-emerald-400 text-[10px] font-bold px-2 py-1 rounded-full border border-emerald-800">
             ただいま受付中
