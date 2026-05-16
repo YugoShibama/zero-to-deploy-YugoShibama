@@ -1,1 +1,1 @@
-# zero-to-deploy-YugoShibamaaa
+# zero-to-deploy-YugoShibama
